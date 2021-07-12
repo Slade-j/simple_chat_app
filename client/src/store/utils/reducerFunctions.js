@@ -1,3 +1,4 @@
+
 export const addMessageToStore = (state, payload) => {
   const { message, sender, recipientId } = payload;
   const unreadCounts = JSON.parse(localStorage.getItem("unreadCounts"));
@@ -109,6 +110,46 @@ export const setConvoIsActive = (state, conversationId) => {
     } else {
       convoCopy.isActive = false;
       return convoCopy;
+    }
+  })
+}
+
+// converts values from server to booleans
+export const readMapConverter = (map) => {
+  // check if there is an active conversation
+  const currentChannel = localStorage.getItem("active-convo") ?
+  JSON.parse(localStorage.getItem("active-convo")) :
+    null;
+
+  for (const conversationId in map) {
+    switch (map[conversationId]) {
+      case 0:
+        map[conversationId] = false;
+        break;
+      case 1:
+        // if the value is one and the ids match the value was due to users active conversation
+        map[conversationId] = map[conversationId] === 1 && conversationId === currentChannel ?
+          false :
+          true;
+        break;
+      case 2:
+        map[conversationId] = true
+        break;
+      default:
+    }
+  }
+  return map
+}
+
+export const setLastReadMessage = (state, payload) => {
+  const { messageId, conversationId } = payload;
+
+  return state.map(convo => {
+    if (convo.id === conversationId) {
+      convo.lastRead = messageId
+      return convo
+    } else {
+      return convo
     }
   })
 }

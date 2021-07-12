@@ -1,3 +1,4 @@
+import { AccordionSummary } from "@material-ui/core";
 import axios from "axios";
 import getSocket, { getSocketEvents } from "../../socket";
 import {
@@ -6,6 +7,7 @@ import {
   setNewMessage,
   setSearchedUsers,
 } from "../conversations";
+import { setReadMap } from "../conversationsRead";
 import { gotUser, setFetchingStatus } from "../user";
 
 axios.interceptors.request.use(async function (config) {
@@ -66,17 +68,22 @@ export const login = (credentials) => async (dispatch) => {
   }
 };
 
+const saveLastRead =  async (conversationId, lastReadMessageId, userId) => {
+  await axios.patch("api/conversations", { conversationId, lastReadMessageId, userId });
+}
+
 export const logout = (logoutParameters) => async (dispatch) => {
-  const { id } = logoutParameters;
+  const { conversationId, id, lastRead } = logoutParameters;
 
   try {
     // logout posts unreadCounts so a single call to backend can handle updating unread columns in conversations
     await axios.post("/auth/logout", logoutParameters);
     localStorage.removeItem("unreadCounts");
     localStorage.removeItem("messenger-token");
+    localStorage.removeItem("active-convo");
     dispatch(gotUser({}));
-    socket.emit("logout", id);
-    socket.disconnect();
+    socket.emit("logout", {id, conversationId, lastRead });
+    await saveLastRead(conversationId, lastRead, id)
   } catch (error) {
     console.error(error);
   }
@@ -87,7 +94,8 @@ export const logout = (logoutParameters) => async (dispatch) => {
 export const fetchConversations = () => async (dispatch) => {
   try {
     const { data } = await axios.get("/api/conversations");
-    dispatch(gotConversations(data));
+    dispatch(gotConversations(data.conversations));
+    dispatch(setReadMap(data.activeConvoMap));
     return data;
   } catch (error) {
     console.error(error);
@@ -104,6 +112,8 @@ const sendMessage = (data, body) => {
     message: data.message,
     recipientId: body.recipientId,
     sender: data.sender,
+    isNewConversation: data.isNewConversation,
+    conversationId: data.conversationId
   });
 };
 
@@ -113,10 +123,9 @@ export const postMessage = (body) => async (dispatch) => {
   try {
     const data = await saveMessage(body);
 
-    // dispatch(setNewMessage(data.message));
-
     if (!body.conversationId) {
       dispatch(addConversation(body.recipientId, data.message));
+      localStorage.setItem("active-convo", data.conversationId);
     } else {
       dispatch(setNewMessage(data.message));
     }
@@ -126,6 +135,16 @@ export const postMessage = (body) => async (dispatch) => {
     console.error(error);
   }
 };
+
+export const recentlyRead = (body) => async (dispatch) => {
+  const { previousConversation, currentConversation, lastRead, user } = body;
+
+  socket.emit("live-conversation", body);
+
+  if (previousConversation && previousConversation.id !== currentConversation.id) {
+    await saveLastRead(previousConversation.id, lastRead, user);
+  }
+}
 
 export const searchUsers = (searchTerm) => async (dispatch) => {
   try {

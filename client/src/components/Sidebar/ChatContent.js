@@ -56,8 +56,9 @@ const ChatContent = (props) => {
   const { conversation } = props;
   const { latestMessageText, otherUser } = conversation;
   const unreadCounts = JSON.parse(localStorage.getItem("unreadCounts"));
-  // use values in state if local storage is empty
-  const unread = unreadCounts ? unreadCounts[conversation.id] : conversation.unread;
+  // use values in state if local storage is empty or null.
+  const isEmpty = unreadCounts && Object.keys(unreadCounts).length === 0;
+  const unread = !unreadCounts || isEmpty ? conversation.unread : unreadCounts[conversation.id];
 
   return (
     <Box className={classes.root}>

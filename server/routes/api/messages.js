@@ -1,15 +1,16 @@
 const router = require("express").Router();
 const { Conversation, Message } = require("../../db/models");
-const onlineUsers = require("../../onlineUsers");
+const { onlineUsers, activeConversations } = require("../../onlineUsers");
 
 // expects {recipientId, text, conversationId } in body (conversationId will be null if no conversation exists yet)
 router.post("/", async (req, res, next) => {
+  let isNewConversation = false;
   try {
     if (!req.user) {
       return res.sendStatus(401);
     }
     const senderId = req.user.id;
-    const { recipientId, text, conversationId, sender } = req.body;
+    const { recipientId, text, conversationId, sender, isOnline } = req.body;
     let conversation = {};
 
     // if we have conversationId use it to find conversation
@@ -22,6 +23,12 @@ router.post("/", async (req, res, next) => {
         senderId,
         recipientId
       );
+      // if there were no conversationId, the activeConversation value was not set and needs to be now
+      if (conversation) {
+        activeConversations.activateConversation(conversation.id);
+        // set isNewConversation so recipient client can open conversation
+        isNewConversation = true;
+      }
     }
 
     if (!conversation) {
@@ -31,6 +38,19 @@ router.post("/", async (req, res, next) => {
         user2Id: recipientId,
       });
       sender.online = onlineUsers.isOnline(senderId)
+      if (onlineUsers.includes(sender.id)) {
+        sender.online = true;
+      }
+      // if a conversation needs to be created, the activeConversation value needs to be updated
+      activeConversations.activateConversation(conversation.id);
+      // set isNewConversation so recipient client can open conversation
+      isNewConversation = true;
+    }
+
+    // if recipiant is offline update unread message count
+    if (!isOnline) {
+      conversation.unread2++
+      await conversation.save();
     }
 
     // make sure sender is part of conversation before creating message
@@ -40,7 +60,7 @@ router.post("/", async (req, res, next) => {
         text,
         conversationId: conversation.id,
       });
-      res.json({ message, sender });
+      res.json({ message, sender, isNewConversation, conversationId: conversation.id });
     } else {
       res.sendStatus(403);
     }

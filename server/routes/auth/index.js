@@ -92,7 +92,8 @@ router.post("/logout", async (req, res, next) => {
 
     await Promise.all(conversations.map(async (convo) => {
       if (unreadCounts[convo.id] >= 0) {
-        convo.unread = unreadCounts[convo.id];
+        if (convo.user1Id === id) convo.unread1 = unreadCounts[convo.id];
+        if (convo.user2Id === id) convo.unread2 = unreadCounts[convo.id];
         return await convo.save();
       } else {
         return await convo.save();
