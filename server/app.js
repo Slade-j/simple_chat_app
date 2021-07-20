@@ -8,7 +8,7 @@ const SequelizeStore = require("connect-session-sequelize")(session.Store);
 const db = require("./db");
 const { User } = require("./db/models");
 const http = require("http");
-const onlineUsers = require("./onlineUsers");
+const { onlineUsers, activeConversations } = require("./onlineUsers");
 // create store for sessions to persist in database
 const sessionStore = new SequelizeStore({ db });
 
@@ -67,6 +67,21 @@ io.use(function(socket, next){
     socket.broadcast.emit("add-online-user", id);
   });
 
+  // <<<<<<<<<<TODO: emit needs to emit to intereasted channel only>>>>>>>>>>>>>
+  socket.on("live-conversation", (data) => {
+    const { previousConversation, currentConversation, user, lastRead } = data;
+    if (previousConversation && previousConversation.id !== currentConversation.id) {
+      activeConversations.deactivateConversation(previousConversation.id);
+      socket.broadcast.emit("closed-conversation", previousConversation.id)
+      socket.broadcast.emit("last-read", { lastRead, conversationId: previousConversation.id });
+    }
+    // in the case of a new message there is no conversation Id and the next two actions will be handled elsewere.
+    if (currentConversation.id) {
+      activeConversations.activateConversation(currentConversation.id, user);
+      socket.broadcast.emit("opened-conversation", currentConversation.id);
+    }
+  })
+
   socket.on("new-message", (data) => {
     // only send message to recipients room
     socket.to(data.recipientId).emit("new-message", {
@@ -74,12 +89,22 @@ io.use(function(socket, next){
       sender: data.sender,
       recipientId: data.recipientId
     });
+    if (data.isNewConversation) {
+      socket.broadcast.emit("opened-conversation", data.conversationId);
+    }
   });
 
-  socket.on("logout", (id) => {
+  // <<<<<<<<TODO: emit ot intereasted channels only>>>>>>>>>>>
+  socket.on("logout", (data) => {
+    const { conversationId, id, lastRead } = data;
     onlineUsers.removeOnlineUser(id);
     socket.broadcast.emit("remove-offline-user", id);
     socket.leave();
+    if (conversationId) {
+      activeConversations.deactivateConversation(conversationId);
+      socket.broadcast.emit("last-read", { lastRead, conversationId })
+      socket.broadcast.emit("closed-conversation", conversationId)
+    }
   });
 });
 

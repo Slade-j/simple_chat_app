@@ -16,9 +16,6 @@ class OnlineUsersMap {
 
 const onlineUsers = new OnlineUsersMap();
 
-module.exports = onlineUsers;
-const onlineUsers = [];
-
 class ActiveConversationsMap {
 
   activateConversation (conversationId) {
