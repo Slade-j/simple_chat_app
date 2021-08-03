@@ -1,4 +1,20 @@
-const onlineUsers = [];
+class OnlineUsersMap {
+
+  addOnlineUser(id) {
+    this[id] = true;
+  }
+
+  removeOnlineUser(id) {
+    this[id] = false;
+  }
+
+  isOnline(id) {
+    return this[id];
+  }
+}
+
+
+const onlineUsers = new OnlineUsersMap();
 
 class ActiveConversationsMap {
 

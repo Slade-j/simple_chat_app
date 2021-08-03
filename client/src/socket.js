@@ -8,36 +8,41 @@ import {
 } from "./store/conversations";
 import { openConversation, closeConversation } from "./store/conversationsRead";
 
-const socket = io(window.location.origin);
+const getSocket = (token) => io.connect(window.location.origin, { query: { token } });
 
-socket.on("connect", () => {
-  console.log("connected to server");
+export const getSocketEvents = (socket) => {
 
-  socket.on("add-online-user", (id) => {
-    store.dispatch(addOnlineUser(id));
-  });
+  return (
+    socket.on("connect", () => {
+      console.log("connected to server");
 
-  socket.on("remove-offline-user", (id) => {
-    store.dispatch(removeOfflineUser(id));
-  });
+      socket.on("add-online-user", (id) => {
+        store.dispatch(addOnlineUser(id));
+      });
 
-  socket.on("opened-conversation", (conversationId) => {
-    store.dispatch(openConversation(conversationId));
-  });
+      socket.on("remove-offline-user", (id) => {
+        store.dispatch(removeOfflineUser(id));
+      });
 
-  socket.on("closed-conversation", (conversationId) => {
-    store.dispatch(closeConversation(conversationId));
-  })
+      socket.on("opened-conversation", (conversationId) => {
+        store.dispatch(openConversation(conversationId));
+      });
 
-  socket.on("last-read", (data) => {
-    if (data.lastRead) {
-    store.dispatch(setLastRead(data.lastRead, data.conversationId));
-    }
-  })
+      socket.on("closed-conversation", (conversationId) => {
+        store.dispatch(closeConversation(conversationId));
+      });
 
-  socket.on("new-message", (data) => {
-    store.dispatch(setNewMessage(data.message, data.recipientId, data.sender));
-  });
-});
+      socket.on("last-read", (data) => {
+        if (data.lastRead) {
+        store.dispatch(setLastRead(data.lastRead, data.conversationId));
+        }
+      });
 
-export default socket;
+      socket.on("new-message", (data) => {
+        store.dispatch(setNewMessage(data.message, data.recipientId, data.sender));
+      });
+    })
+  )
+}
+
+export default getSocket;
